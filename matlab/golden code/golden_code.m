@@ -12,7 +12,12 @@ s0_b = uint32(2584963208);
 s1_b = uint32(3414123685);
 s2_b = uint32(458793276);
 
-for i = 1 : 100
+x_x0 = [];
+x_x1 = [];
+x_u0 = [];
+x_u1 = [];
+count =0;
+for i = 1 : 6553600
 
     b0   = uint32( bitshift(bitxor( bitshift(s0, 13), s0, 'uint32'), -19) );
     s0   = uint32( bitxor( bitshift(  bitand(s0, 4294967294, 'uint32'), 12, 'uint32'), b0, 'uint32'));
@@ -56,41 +61,48 @@ for i = 1 : 100
     uT_C2_x_e_b_2= fi(uT_x_e_b_2, 0,98, 96) * fi(C2, 1, 13, 12);    % signed number (C2 * x * x)
     uT_C1_x_e_b  = fi(x_e_b, 0, 49, 48) * fi(C1, 0, 22, 22);            % unsigned number (C1 * x)
     uT_C0_C1_x_e_b_sum = fi(uT_C1_x_e_b, 0,71, 70) +  fi(C0, 1, 30, 28);  % sum
-    uT_y_e       = fi(uT_C2_x_e_b_2, 1 ,111, 108)+ fi(uT_C0_C1_x_e_b_sum, 1,73, 70);
+    uT_y_e       = fi(uT_C2_x_e_b_2, 1 ,112, 108)+ fi(uT_C0_C1_x_e_b_sum, 1,73, 70);
     nTBP         = numerictype(1,32,27);
     y_e          = quantize(uT_y_e, nTBP, 'Round', 'Saturate');         % quantizing with required bit width
     ln2          = fi(log(2), 0, 32, 32);
     ebar         = fi((ln2 * exp_e), 0, 34,28);
-    e            = fi((ebar - y_e), 0, 31,24);              % output of logarithm
+    e            = bitshift(fi((ebar - y_e), 0, 31,24),1);              % output of logarithm
 
 %%
-    k            = bitand(e,127);
-    exp_f        = 5 - LeadingZeroDetector( uint8(k) , 7);          % calulates LRZ for e
-    x_f1         = bitshift( fi(e,0,31), -1 * exp_f);  
-    if bitand(exp_f, 1, 'uint8') == 1                   % condition to check if input is in [1,2)
-        x_f      = bitshift( fi(x_f1,0,31), -1);   
-        x_f_a = bitshift(fi(x_f,0,31), -25);    
-        x_f_a  = bitshift(fi(x_f_a,0,32,26), 26); 
-        x_f_b = bitshift(fi(x_f,0,31), 6);
+    exp_f        = 5 - LeadingZeroDetector( storedInteger(e) , 31);          % calulates LRZ for e
+    if exp_f > 0
+        x_f1     = bitsra(e,exp_f); 
+    elseif exp_f < 0
+        x_f1     = bitsll(e,-1 * exp_f);
+        
+    else
+        x_f1     = e; 
+        count = count +1;
+    end
+    if bitand(exp_f, 1, 'int8') == 1                   % condition to check if input is in [1,2)
+        x_f      = bitsra(x_f1, 1);
+        x_f_a_1  = bitsra(x_f, 25); 
+        x_f_a    = bitsll(fi(x_f_a_1,0,37,30),30);
+        x_f_b    = bitsll(x_f,6);
         [C1, C0] = sqrt_coefficients_1_2(x_f_a);
         uT_c1_x_f_b = fi(x_f_b, 0, 31,24) * fi(C1, 0, 12, 12);          % uT - untruncated
         uT_y_f   = fi(uT_c1_x_f_b, 0, 43,36) + fi(C0, 0, 20, 19);
         nTBP     = numerictype(0,20,13);
         y_f      = quantize(uT_y_f, nTBP, 'Round', 'Saturate'); 
-        exp_f1   = shiftbits( (exp_f + 1), -1, 3);
+        exp_f1   = bitshift((exp_f + 1), -1, 'int8');
     else                                                                 % input in range [2,4)
         x_f = x_f1;
-        x_f_a = bitshift(fi(x_f,0,31), -25);    
-        x_f_a  = bitshift(fi(x_f_a,0,32,26), 26) 
-        x_f_b = bitshift(fi(x_f,0,31), 6);
+        x_f_a_1 = bitsra(x_f, 25);     
+        x_f_a = bitsll(fi(x_f_a_1,0,37,30),30);
+        x_f_b    = bitsll(x_f,6);
         [C1, C0] = sqrt_coefficients_2_4(x_f_a);
         uT_c1_x_f_b = fi(x_f_b, 0, 31,24) * fi(C1, 0, 12, 12);
         uT_y_f = fi(uT_c1_x_f_b, 0, 43,36) + fi(C0, 0, 20, 19);
         nTBP = numerictype(0,20,13);
         y_f = quantize(uT_y_f, nTBP, 'Round', 'Saturate');
-        exp_f1 = shiftbits( exp_f, -1, 3);
+        exp_f1 = bitshift(exp_f, -1, 'int8');
     end
-    f = bitshift(fi(y_f, 0, 20,13), exp_f1);    
+    f = bitshift(fi(y_f, 0, 20,13), exp_f1);   
 
 %%
     quad = bitshift( u1 ,-14 );     % finds which quadrant the sample is in
@@ -138,11 +150,30 @@ for i = 1 : 100
 % calculation of noise signal
     x0 = sfi((g0*f),16,11);
     x1 = sfi((g1*f),16,11);
+    
+
  % conversion to integer format for comparision   
-    x0_int = storedInteger(x0);
-    x1_int = storedInteger(x1);
+    x0_int = storedIntegerToDouble(x0);
+    x1_int = storedIntegerToDouble(x1);
+    x_x0 = [x_x0, double(x0)];
+    x_x1 = [x_x1, double(x1)];
+    x_u0 = [x_u0, u0];
+    x_u1 = [x_u1, u1];
+
     
     fprintf(fileID_x0, '%d\n', int32(x0_int));
     fprintf(fileID_x1, '%d\n', int32(x1_int));
 end
+    x_x0 = sort(x_x0);
+    x_x1 = sort(x_x1);
+    m0 = mean(x_x0);
+    m1 = mean(x_x1);
+    std0 = std(x_x0);
+    std1 = std(x_x1);
+    Z0 = (x_x0 - m0)/std0;
+    Z1 = (x_x0 - m0)/std1;
+    cdf0 = makedist('Normal', 'mu',m0, 'sigma',std0);
+    cdf1 = makedist('Normal', 'mu',m1, 'sigma',std1);
+    [h0, p0,k0,c0] = kstest(Z0, 'CDF', cdf0);
+    [h1, p1,k1,c1] = kstest(Z1, 'CDF', cdf1);
 
