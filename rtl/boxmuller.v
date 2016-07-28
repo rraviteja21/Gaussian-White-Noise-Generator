@@ -146,6 +146,8 @@ begin
 		curr_g0 <= next_g0;
 		curr_g1 <= next_g1;
 		ovalid <= `TRUE;
+		x0 <= x0_p;		// output
+		x1 <= x1_p;    /* multiplies the out put of cos/sine and log/sqrt functions and produces noise signals*/
 	end
 end
 
@@ -234,11 +236,6 @@ begin
 		end
 		endcase
 end
-/* multiplies the out put of cos/sine and log/sqrt functions and produces noise signals*/
-always @(posedge clk )
-begin
-	x0 <= x0_p;
-	x1 <= x1_p;
-end
+
 
 endmodule
