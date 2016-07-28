@@ -54,7 +54,7 @@ sqrt srt_0 (    .x_f(curr_x_f),
 	            .y_f(y_f) );
 				
 cos_mul cos_mul_0( .x_g_a(curr_x_g_a),
-		  .x_g_b(curr_x_g_a),
+		  .x_g_b(curr_x_g_b),
 		  .y_g_a(y_g_a),
 		  .y_g_b(y_g_b));
 		  
@@ -150,21 +150,21 @@ begin
 end
 
 /* This always block is triggered when a or b or positive edge of clock occurs. The inputs are latched into "next" registers.     */
-always @(posedge clk or a or b)
+always @(posedge clk)
 begin
 	next_a <= a;
 	next_b <= b;
 end
 
 /*Whenevr the "curr" a or b changes, the "next" u0 and u1 are calculated.*/
-always @(posedge clk or  curr_a or curr_b)
+always @(posedge clk )
 begin
 	next_u0 <= {curr_a, curr_b[31: 16]};
 	next_u1 <= curr_b[15 : 0];
 
 end
 /*The u0 value is the input to the logarithm and square root functions. So evry clock cycle, the "next" x_e and exp_e signals are evaluated.*/
-always @( posedge clk or curr_u0)
+always @( posedge clk )
 begin
 	if(valid48==`TRUE) begin
 		next_x_e <= curr_u0 << ( p48 + 1);
@@ -174,13 +174,13 @@ end
 
 /* Based on the "curr" exp_e the sigals eBar and y_e are calculated by the multipliers and the results are subtracted to generate "next eBar"
 eBar is an unsigned number, while y_e is a signed 2's complemented number. So y_e is just added to eBar.*/
-always @(posedge clk or curr_exp_e)
+always @(posedge clk)
 begin
 	next_e <= ({1'b0,eBar[31:2]} + {{1{y_e[31]}},y_e[31:3]}) <<1;
 end
 /*Based on the "curr" exp_f, the LZD for the for the "curr e " is calculated from the LRZ48 instatiation above. And "next" x_f is calculated 
 based on the LRZ output*/
-always @(posedge clk or curr_e)
+always @(posedge clk)
 begin
 	if(valid8==`TRUE) begin
 		next_exp_f <= 3'b101  - (p8 - 1'b1);
@@ -188,28 +188,28 @@ begin
 	end
 end
 /* "next f" i calcualted based on "curr exp_f". y_f is the output of the sqrt instatiation above based on the "curr x_f"*/
-always @(posedge clk or curr_x_f)
+always @(posedge clk )
 begin
-	if(curr_x_f[0] == `TRUE)
+	if(curr_exp_f[0] == `TRUE)
 		next_f <= y_f << ((curr_exp_f +1)>>1);
 	else 
 		next_f <= y_f << (curr_exp_f >> 1);
 end
 /* This always block calculates the input for cos and sine functions*/
-always @( posedge clk or curr_u1)
+always @( posedge clk)
 begin
  	next_x_g_a  <= curr_u1[13: 0];
 	next_x_g_b <= 14'b1 - curr_u1[13: 0];
 	next_seg_1 <= curr_u1[15:14];
 end
 /*calculates the output from cos_mul instatiation above based on curr x_g */
-always @( posedge clk or curr_x_g_a or curr_x_g_b)
+always @( posedge clk)
 begin
 	next_y_g_a <= y_g_a;
 	next_y_g_b <= y_g_b;
 end
 /*based on which quadrant they belog to, corresponding 2's complement numbers are generated*/
-always @(posedge clk or curr_y_g_a or curr_y_g_b or curr_seg)
+always @(posedge clk)
 begin
 	case(curr_seg)
 		2'b00:
@@ -235,7 +235,7 @@ begin
 		endcase
 end
 /* multiplies the out put of cos/sine and log/sqrt functions and produces noise signals*/
-always @(posedge clk or curr_g0 or curr_g1 or curr_f)
+always @(posedge clk )
 begin
 	x0 <= x0_p;
 	x1 <= x1_p;
